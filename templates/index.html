@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Indian Stock Dashboard</title>
+  <meta name="description" content="Live NSE stock dashboard with real-time prices, MA/RSI charts, portfolio tracker, and alerts." />
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta name="theme-color" content="#6c63ff" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1/dist/chartjs-adapter-luxon.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1/dist/chartjs-chart-financial.min.js"></script>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+</head>
+<body>
+
+  <!-- ── TICKER TAPE ─────────────────────────────────── -->
+  <div class="ticker-wrap">
+    <div class="ticker-track">
+      <div class="ticker-content" id="ticker-content">
+        <span class="tick-loading">Connecting to live feed…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── HEADER ──────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-icon">📈</span>
+        <div>
+          <h1 class="brand-title">Indian Stock Dashboard</h1>
+          <p class="brand-subtitle">NSE Real-Time · WebSocket · MongoDB</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="market-status" id="market-status"><span class="dot dot-grey"></span> Checking…</div>
+        <button class="btn-theme" id="btn-theme" title="Toggle Theme">🌙</button>
+        <div class="live-badge"><span class="pulse"></span> LIVE</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- ── PERFORMERS ─────────────────────────────────── -->
+    <div class="performers-banner" id="performers-banner"></div>
+
+    <!-- ── HEATMAP ─────────────────────────────────────── -->
+    <section class="section">
+      <h2 class="section-title">Market Heatmap</h2>
+      <div class="heatmap-grid" id="heatmap-grid"></div>
+    </section>
+
+    <!-- ── PRICE CARDS ─────────────────────────────────── -->
+    <section class="section">
+      <div class="section-header">
+        <h2 class="section-title">Current Prices</h2>
+        <button class="btn-export" id="btn-export">⬇ Export CSV</button>
+      </div>
+      <div class="cards-grid" id="cards-grid">
+        <div class="skeleton-card"></div><div class="skeleton-card"></div>
+        <div class="skeleton-card"></div><div class="skeleton-card"></div>
+        <div class="skeleton-card"></div><div class="skeleton-card"></div>
+      </div>
+      <p class="last-updated" id="last-updated">Connecting…</p>
+    </section>
+
+    <!-- ── STATISTICS ──────────────────────────────────── -->
+    <section class="section">
+      <h2 class="section-title">Statistics</h2>
+      <div class="stats-grid" id="stats-grid">
+        <div class="skeleton-card" style="height:130px"></div>
+        <div class="skeleton-card" style="height:130px"></div>
+        <div class="skeleton-card" style="height:130px"></div>
+        <div class="skeleton-card" style="height:130px"></div>
+        <div class="skeleton-card" style="height:130px"></div>
+        <div class="skeleton-card" style="height:130px"></div>
+      </div>
+    </section>
+
+    <!-- ── PORTFOLIO TRACKER ───────────────────────────── -->
+    <section class="section">
+      <h2 class="section-title">💼 Portfolio Tracker</h2>
+      <div class="portfolio-panel">
+        <div class="portfolio-form-row">
+          <select id="port-symbol" class="form-control"></select>
+          <input  id="port-shares" class="form-control" type="number" placeholder="Shares owned" min="0" step="1" />
+          <input  id="port-buyprice" class="form-control" type="number" placeholder="Buy price ₹" min="0" step="0.01" />
+          <button class="btn-add-port" id="btn-add-port">Add</button>
+        </div>
+        <div class="portfolio-table-wrap" id="portfolio-table-wrap">
+          <p class="no-data">No holdings added yet.</p>
+        </div>
+        <div class="portfolio-summary" id="portfolio-summary"></div>
+      </div>
+    </section>
+
+    <!-- ── PRICE ALERTS ────────────────────────────────── -->
+    <section class="section">
+      <h2 class="section-title">🔔 Price Alerts</h2>
+      <div class="alerts-panel">
+        <form class="alert-form" id="alert-form">
+          <select id="alert-symbol" class="form-control"></select>
+          <select id="alert-type" class="form-control">
+            <option value="above">≥ Above</option>
+            <option value="below">≤ Below</option>
+          </select>
+          <input id="alert-price" class="form-control" type="number" placeholder="Target ₹" step="0.01" required />
+          <button type="submit" class="btn-alert">Set Alert</button>
+        </form>
+        <div class="alert-list" id="alert-list"><span class="no-data">No alerts set</span></div>
+      </div>
+    </section>
+
+    <!-- ── WATCHLIST MANAGER ───────────────────────────── -->
+    <section class="section">
+      <h2 class="section-title">📋 Watchlist Manager</h2>
+      <div class="watchlist-panel">
+        <div class="watchlist-form">
+          <input id="wl-ticker" class="form-control" placeholder="NSE Ticker (e.g. SBIN.NS)" style="flex:1"/>
+          <button class="btn-wl-add" id="btn-wl-add">+ Add Stock</button>
+          <span id="wl-status" class="wl-status"></span>
+        </div>
+        <div class="watchlist-tags" id="watchlist-tags"></div>
+      </div>
+    </section>
+
+    <!-- ── HISTORY CHARTS (MA + RSI + Trendline) ─────── -->
+    <section class="section">
+      <div class="section-header">
+        <h2 class="section-title">Price History</h2>
+        <div class="chart-controls">
+          <div class="time-filters">
+            <button class="time-btn active" data-minutes="0">All</button>
+            <button class="time-btn" data-minutes="60">1 hr</button>
+            <button class="time-btn" data-minutes="30">30 min</button>
+            <button class="time-btn" data-minutes="5">5 min</button>
+          </div>
+          <div class="overlay-toggles">
+            <label class="toggle-label"><input type="checkbox" id="toggle-ma" checked /> MA7/MA20</label>
+            <label class="toggle-label"><input type="checkbox" id="toggle-trend" checked /> Trend</label>
+            <label class="toggle-label"><input type="checkbox" id="toggle-rsi" /> RSI</label>
+          </div>
+        </div>
+      </div>
+      <div class="charts-grid" id="charts-grid"></div>
+    </section>
+
+    <!-- ── STOCK COMPARISON ────────────────────────────── -->
+    <section class="section">
+      <h2 class="section-title">📊 Stock Comparison</h2>
+      <div class="compare-controls">
+        <select id="cmp-a" class="form-control"></select>
+        <span style="color:var(--text-muted);font-weight:600">vs</span>
+        <select id="cmp-b" class="form-control"></select>
+        <button class="btn-compare" id="btn-compare">Compare</button>
+      </div>
+      <div class="chart-card" id="compare-card" style="display:none">
+        <div class="chart-wrapper" style="height:260px">
+          <canvas id="compare-chart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CANDLESTICK (+ Volume) ──────────────────────── -->
+    <section class="section">
+      <h2 class="section-title">Today's Candlestick Chart (5-min OHLC + Volume)</h2>
+      <div class="candle-selector" id="candle-selector"></div>
+      <div class="candle-card">
+        <div class="candle-loading" id="candle-loading">Loading OHLC data…</div>
+        <div class="chart-wrapper" style="height:280px"><canvas id="candle-chart"></canvas></div>
+        <div class="chart-wrapper" style="height:90px; margin-top:6px"><canvas id="volume-chart"></canvas></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>Data sourced from Yahoo Finance · MongoDB · Flask + SocketIO · Chart.js | <span id="pwa-install-btn" style="cursor:pointer;color:var(--accent);display:none"> 📲 Install App</span></p>
+  </footer>
+
+  <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
