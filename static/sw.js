@@ -1,4 +1,4 @@
-const CACHE = "stockdash-v1";
+const CACHE = "stockdash-v2";
 const ASSETS = ["/", "/static/css/style.css", "/static/js/dashboard.js"];
 
 self.addEventListener("install", e => {

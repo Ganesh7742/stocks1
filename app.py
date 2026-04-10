@@ -56,6 +56,13 @@ def api_health_db():
     status_code = 200 if ok else 503
     return jsonify({"ok": ok, "details": details}), status_code
 
+
+@app.errorhandler(404)
+def handle_404(err):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Not Found"}), 404
+    return err
+
 @app.route("/api/stocks/ohlc/<symbol>")
 def api_ohlc(symbol):
     """Fetch today's 5-min OHLC for candlestick chart."""

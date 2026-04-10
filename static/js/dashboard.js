@@ -395,7 +395,24 @@ async function loadCandlestick(symbol) {
   const loadEl=document.getElementById("candle-loading");
   if (loadEl){loadEl.textContent=`Loading OHLC for ${symbol}…`;loadEl.style.display="flex";}
   try {
-    const data = await fetch(`/api/stocks/ohlc/${symbol}`).then(r=>r.json());
+    const res = await fetch(`/api/stocks/ohlc/${encodeURIComponent(symbol)}`);
+    const text = await res.text();
+    let data;
+    try {
+      data = text ? JSON.parse(text) : [];
+    } catch (_) {
+      throw new Error(`Server returned non-JSON response (${res.status})`);
+    }
+
+    if (!res.ok) {
+      const msg = data && data.error ? data.error : `Request failed (${res.status})`;
+      throw new Error(msg);
+    }
+
+    if (data && !Array.isArray(data) && data.error) {
+      throw new Error(data.error);
+    }
+
     if (!Array.isArray(data)||!data.length){if(loadEl)loadEl.textContent=`No OHLC data for ${symbol} (market may be closed)`;return;}
     if (loadEl) loadEl.style.display="none";
     const meta=metaFor(symbol);
