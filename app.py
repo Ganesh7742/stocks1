@@ -2,13 +2,21 @@ import json, os
 from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
-from database import get_all_prices, get_latest_prices, get_stats_per_symbol
+from database import (
+    check_db_connection,
+    get_all_prices,
+    get_latest_prices,
+    get_stats_per_symbol,
+)
 from scraper import start_scheduler
 import yfinance as yf
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app      = Flask(__name__)
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+socketio = None
 
 CONFIG_PATH  = os.path.join(os.path.dirname(__file__), "stocks_config.json")
 DISPLAY_MAP  = {}   # ticker → display name, rebuilt on each watchlist call
@@ -19,9 +27,7 @@ def load_display_map():
     return {t: t.replace(".NS", "").replace(".BO", "") for t in tickers}
 
 DISPLAY_MAP = load_display_map()
-
-# Start background scraper, pass socketio for real-time push
-scheduler = start_scheduler(socketio)
+scheduler = None
 
 
 # ── PAGES ─────────────────────────────────────────────────
@@ -42,6 +48,13 @@ def api_stocks_latest():
 @app.route("/api/stocks/stats")
 def api_stocks_stats():
     return jsonify(get_stats_per_symbol())
+
+
+@app.route("/api/health/db")
+def api_health_db():
+    ok, details = check_db_connection()
+    status_code = 200 if ok else 503
+    return jsonify({"ok": ok, "details": details}), status_code
 
 @app.route("/api/stocks/ohlc/<symbol>")
 def api_ohlc(symbol):
@@ -110,4 +123,13 @@ def api_watchlist_remove():
 
 
 if __name__ == "__main__":
-    socketio.run(app, debug=False, use_reloader=False, port=5000)
+    ok, details = check_db_connection()
+    if not ok:
+        raise RuntimeError(f"Supabase connectivity check failed: {details}")
+
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+
+    # Start background scraper only after DB connectivity is verified.
+    scheduler = start_scheduler(socketio)
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, host="0.0.0.0", port=port, debug=False, use_reloader=False)

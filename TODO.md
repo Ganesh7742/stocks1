@@ -2,9 +2,9 @@
 
 ## Steps:
 1. [x] Init git repo
-2. [x] Add all files (removed empty stock/ dir)
-3. [ ] Commit initial changes
-4. [ ] Add remote origin
-5. [ ] Push to main
+2. [x] Add all files
+3. [x] Commit initial changes
+4. [x] Add remote origin
+5. [x] Push to main
 
 Updated after each step.

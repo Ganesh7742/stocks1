@@ -23,7 +23,7 @@ def load_stocks():
 
 
 def fetch_and_store():
-    """Fetch latest price for each configured stock and store in MongoDB."""
+    """Fetch latest price for each configured stock and store in Supabase."""
     tickers = load_stocks()
     for ticker in tickers:
         try:
